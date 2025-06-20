@@ -1,0 +1,13 @@
+streamlit>=1.28.0
+tensorflow>=2.10.0
+opencv-python>=4.8.0
+numpy>=1.21.0
+pillow>=9.0.0
+imageio[pyav]>=2.25.0
+# Add to requirements.txt
+moviepy>=1.0.3
+Flask==2.3.3
+Flask-CORS==4.0.0
+opencv-python==4.8.1.78
+Pillow==10.0.1
+numpy==1.24.3
