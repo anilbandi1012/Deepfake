@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepFake Detector</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; color: white; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .card { background: white; border-radius: 15px; padding: 30px; margin-bottom: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .upload-area { border: 3px dashed #ddd; border-radius: 10px; padding: 40px; text-align: center; margin-bottom: 20px; transition: all 0.3s; }
+        .upload-area:hover { border-color: #667eea; background: #f8f9ff; }
+        .file-input { display: none; }
+        .upload-btn { background: linear-gradient(45deg, #667eea, #764ba2); color: white; border: none; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-size: 16px; transition: transform 0.2s; }
+        .upload-btn:hover { transform: translateY(-2px); }
+        .results { margin-top: 20px; }
+        .result-item { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; border-left: 4px solid #28a745; }
+        .deepfake { border-left-color: #dc3545 !important; background: #fff5f5; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .stat-card { background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 10px; text-align: center; }
+        .processed-image { max-width: 100%; border-radius: 10px; margin: 15px 0; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { color: #dc3545; background: #fff5f5; padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .success { color: #28a745; background: #f0fff4; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎭 DeepFake Detector</h1>
+            <p>Advanced AI-powered detection for images and videos</p>
+        </div>
+
+        <div class="card">
+            <h2>Upload Media</h2>
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <p>📁 Click to select image or video file</p>
+                <p style="font-size: 14px; color: #666; margin-top: 10px;">Supports: JPG, PNG, MP4, AVI, MOV (Max: 100MB)</p>
+                <input type="file" id="fileInput" class="file-input" accept=".jpg,.jpeg,.png,.mp4,.avi,.mov" onchange="handleFileSelect(event)">
+                <br><br>
+                <button class="upload-btn">Choose File</button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing your file...</p>
+            </div>
+
+            <div id="message"></div>
+
+            <div class="results" id="results" style="display: none;">
+                <h3>Analysis Results</h3>
+                <div id="resultContent"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Statistics</h2>
+            <div class="stats" id="stats">
+                <div class="stat-card">
+                    <h3 id="totalScanned">-</h3>
+                    <p>Total Scanned</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="deepfakesFound">-</h3>
+                    <p>Deepfakes Found</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="accuracyRate">-</h3>
+                    <p>Accuracy Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load stats on page load
+        loadStats();
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+            
+            showLoading(true);
+            clearMessage();
+            document.getElementById('results').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const endpoint = fileType === 'image' ? '/api/analyze-image' : '/api/analyze-video';
+
+            fetch(endpoint, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoading(false);
+                if (data.success) {
+                    if (fileType === 'image') {
+                        displayImageResults(data);
+                    } else {
+                        displayVideoResults(data);
+                    }
+                    loadStats(); // Refresh stats
+                } else {
+                    showMessage(data.error || 'Processing failed', 'error');
+                }
+            })
+            .catch(error => {
+                showLoading(false);
+                showMessage('Error: ' + error.message, 'error');
+            });
+        }
+
+        function displayImageResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('resultContent');
+            
+            let html = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <strong>Faces Detected: ${data.faces_detected} | Deepfakes Found: ${data.deepfakes_found}</strong>
+                </div>
+            `;
+
+            if (data.processed_image) {
+                html += `<img src="${data.processed_image}" class="processed-image" alt="Processed image">`;
+            }
+
+            data.results.forEach((result, index) => {
+                const isDeepfake = result.label === 'Deepfake';
+                html += `
+                    <div class="result-item ${isDeepfake ? 'deepfake' : ''}">
+                        <strong>Face ${result.face}:</strong> 
+                        ${result.label} 
+                        <span style="float: right;">${(result.confidence * 100).toFixed(1)}% confidence</span>
+                    </div>
+                `;
+            });
+
+            contentDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            showMessage('Image analysis completed successfully!', 'success');
+        }
+
+        function displayVideoResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('resultContent');
+            
+            const html = `
+                <div class="result-item">
+                    <strong>Video Processing Complete</strong>
+                    <p style="margin: 10px 0;">Your video has been analyzed and processed.</p>
+                    <video controls style="max-width: 100%; border-radius: 8px; margin: 10px 0;">
+                        <source src="${data.processed_video}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <br>
+                    <a href="${data.processed_video}" download="${data.filename}_processed.mp4" style="background: #28a745; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none;">
+                        📥 Download Video
+                    </a>
+                </div>
+            `;
+
+            contentDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+            showMessage('Video processing completed successfully!', 'success');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showMessage(text, type = 'success') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
+        }
+
+        function clearMessage() {
+            document.getElementById('message').innerHTML = '';
+        }
+
+        function loadStats() {
+            fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalScanned').textContent = data.total_scanned || 0;
+                document.getElementById('deepfakesFound').textContent = data.deepfakes_found || 0;
+                document.getElementById('accuracyRate').textContent = data.accuracy_rate || 'N/A';
+            })
+            .catch(error => {
+                console.log('Stats loading failed:', error);
+            });
+        }
+
+        // Auto-refresh stats every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

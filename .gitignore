@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.ipynb_checkpoints
+*.log
+
+# Environment
+.env
+venv/
+.env/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Data & Models
+*.h5
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.csv
+*.npz
+*.npy
+dataset/
+models/
+checkpoints/
+
+# OS Files
+.DS_Store
+Thumbs.db
